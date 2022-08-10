@@ -294,9 +294,29 @@ void increase_score(bird *b, pipe *p, int *score) {
    }
 }
 
+// read highscore from file
+void read_highscore(int *highscore) {
+   FILE *fptr = fopen("highscore.txt", "ab+");
+   fscanf(fptr, "%d", highscore);
+   fclose(fptr);
+}
+
+// save score as highscore
+void save_score(int score, int highscore) {
+   if (score < highscore)
+      return;
+
+   FILE *fptr = fopen("highscore.txt", "wb+");
+   fprintf(fptr, "%d", score);
+   fclose(fptr);
+}
+
 EXIT_STATUS run() {
    // init variables
    int score = 0;
+   int highscore = 0;
+   read_highscore(&highscore);
+
    bird *flappy = new_bird();
    pipe *pipes = init_pipes();
 
@@ -312,6 +332,7 @@ EXIT_STATUS run() {
       if (ch == Q_KEY) {
          free_pipes(pipes);
          free_bird(flappy);
+         save_score(score, highscore);
          return EXIT; 
       }
       if (ch == SPACE)
@@ -327,12 +348,14 @@ EXIT_STATUS run() {
       // check for collisions
       EXIT_STATUS = check_collision(flappy, pipes, score);
       switch (EXIT_STATUS) {
-         case PLAY_AGAIN:  return PLAY_AGAIN;
-         case EXIT:        return EXIT;
+         case PLAY_AGAIN:  save_score(score, highscore); return PLAY_AGAIN;
+         case EXIT:        save_score(score, highscore); return EXIT;
       }
 
       // check for increase score
       increase_score(flappy, pipes, &score);
+      // update highscore in real time
+      highscore = fmax(highscore, score);
 
       // OOB
       check_out_of_bounds(pipes);
@@ -341,9 +364,10 @@ EXIT_STATUS run() {
       draw_bird(flappy);
 
       attron(COLOR_PAIR(PIPE_PAIR));
-      mvprintw(LINES - 1, 0, "%d point(s) space jump | q/ctrl+c quit", score);
+      mvprintw(LINES - 1, 0, "%d point(s) %d highscore | space jump | q quit", score, highscore);
       attroff(COLOR_PAIR(PIPE_PAIR));
    }
+   save_score(score, highscore);
    return EXIT;
 }
 
@@ -351,9 +375,11 @@ int main(void) {
    init_ncurses();
    srand(time(NULL));
    EXIT_STATUS STATUS;
+
    do {
       STATUS = run();
    } while(STATUS != EXIT);
+
    endwin();
    return 0;
 }
